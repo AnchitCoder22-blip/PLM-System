@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Parking Lot Management</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+
+    <style>
+        .plate-input {
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        .table-wrapper {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="index.html">
+                <i class="fa-solid fa-square-parking me-2 text-primary"></i>ParkManager
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="entry.html">Vehicle Entry</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="exit.html">Vehicle Exit</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="admin.html">Admin Panel</a>
+                    </li>
+                    <li class="nav-item ms-lg-3 mt-2 mt-lg-0 d-flex gap-2">
+                        <button class="btn btn-outline-light btn-sm" id="darkModeBtn" onclick="toggleDarkMode()"
+                            title="Toggle Dark Mode">
+                            <i class="fa-solid fa-moon"></i>
+                        </button>
+                        <button class="btn btn-outline-light btn-sm flex-grow-1" onclick="logout()">
+                            <i class="fa-solid fa-right-from-bracket me-1"></i>Logout
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5 mb-5">
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold text-secondary">
+                <i class="fa-solid fa-shield-halved me-2 text-primary"></i>Admin Control Panel
+            </h2>
+            <div class="d-flex gap-3 align-items-center">
+                <button class="btn btn-danger shadow-sm fw-bold" onclick="clearAllSlots()">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>Clear All Slots
+                </button>
+
+                <div class="bg-white px-3 py-2 rounded-3 shadow-sm border text-muted fw-semibold">
+                    Total Registered: <span id="totalEmployees" class="text-primary fs-5 ms-1">0</span>
+                </div>
+            </div>
+        </div>
+        <div class="row g-4">
+
+            <div class="col-12 col-md-5 col-lg-4">
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-white py-3 border-bottom-0">
+                        <h5 class="mb-0 fw-bold text-secondary">Register Employee</h5>
+                    </div>
+                    <div class="card-body px-4 pb-4">
+                        <form id="registerForm">
+                            <div class="mb-3">
+                                <label for="empName" class="form-label text-muted fw-semibold small">Full Name</label>
+                                <input type="text" class="form-control" id="empName" placeholder="e.g. Rahul Sharma"
+                                    required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="empId" class="form-label text-muted fw-semibold small">Employee ID</label>
+                                <input type="text" class="form-control" id="empId" placeholder="e.g. EMP-1042" required>
+                            </div>
+                            <div class="mb-4">
+                                <label for="empPlate" class="form-label text-muted fw-semibold small">Vehicle Number
+                                    Plate</label>
+                                <input type="text" class="form-control plate-input" id="empPlate"
+                                    placeholder="e.g. MP07AB1234" required autocomplete="off">
+                                <div class="form-text">Enter exactly as it will be typed at entry.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">
+                                <i class="fa-solid fa-user-plus me-2"></i>Save Employee
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-7 col-lg-8">
+                <div class="card shadow-sm border-0 rounded-3 h-100">
+                    <div class="card-header bg-white py-3 border-bottom-0">
+                        <h5 class="mb-0 fw-bold text-secondary">Employee Directory</h5>
+                    </div>
+                    <div class="card-body p-0 table-wrapper table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th class="ps-4">Emp ID</th>
+                                    <th>Name</th>
+                                    <th>Number Plate</th>
+                                    <th class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeeTableBody">
+                            </tbody>
+                        </table>
+
+                        <div id="emptyState" class="text-center p-5 d-none">
+                            <i class="fa-regular fa-folder-open text-muted mb-3" style="font-size: 3rem;"></i>
+                            <h5 class="text-muted">No employees registered yet.</h5>
+                            <p class="text-muted small">Use the form on the left to add your first employee.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="row g-4 mt-2">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 rounded-3 h-100">
+                    <div
+                        class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold text-secondary">Entry & Exit Logs</h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="renderLogsTable()">
+                            <i class="fa-solid fa-arrows-rotate me-1"></i>Refresh
+                        </button>
+                    </div>
+                    <div class="card-body p-0 table-wrapper table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th class="ps-4">Token</th>
+                                    <th>Plate</th>
+                                    <th>Type</th>
+                                    <th>Slot</th>
+                                    <th>Date</th>
+                                    <th>Time In</th>
+                                    <th>Time Out</th>
+                                    <th>Status</th>
+                                    <th class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logsTableBody">
+                            </tbody>
+                        </table>
+
+                        <div id="emptyLogsState" class="text-center p-5 d-none">
+                            <i class="fa-solid fa-clipboard-list text-muted mb-3" style="font-size: 3rem;"></i>
+                            <h5 class="text-muted">No logs available.</h5>
+                            <p class="text-muted small">Vehicle entries and exits will appear here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
