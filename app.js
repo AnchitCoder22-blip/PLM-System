@@ -77,8 +77,79 @@ function showConfirm(message, confirmText = 'Yes', cancelText = 'Cancel') {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// OCR & CAMERA HELPERS
+// ═════════════════════════════════════════════════════════════════════════════
+
+async function initCamera(videoElementId, startBtnId, scanBtnId) {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const video = document.getElementById(videoElementId);
+        video.srcObject = stream;
+        video.style.display = 'block';
+        
+        document.getElementById(startBtnId).style.display = 'none';
+        document.getElementById(scanBtnId).style.display = 'inline-block';
+        
+        showToast('Camera started successfully.', 'success');
+    } catch (err) {
+        console.error('Camera Error:', err);
+        showToast('Unable to access camera. Please check permissions.', 'error');
+    }
+}
+
+async function scanLicensePlate(videoElementId, canvasId, targetInputId) {
+    const video = document.getElementById(videoElementId);
+    const canvas = document.getElementById(canvasId);
+    const context = canvas.getContext('2d');
+    
+    if (!video.videoWidth) {
+        showToast('Camera not ready yet.', 'error');
+        return;
+    }
+    
+    // Set canvas dimensions to match video frame
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Draw current video frame to canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    const scanBtn = window.event ? (window.event.currentTarget || window.event.target.closest('button')) : null;
+    let originalText = '';
+    if (scanBtn) {
+        originalText = scanBtn.innerHTML;
+        scanBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Scanning...';
+        scanBtn.disabled = true;
+    }
+    
+    try {
+        showToast('Analyzing image...', 'info');
+        const { data: { text } } = await Tesseract.recognize(canvas, 'eng');
+        
+        // Clean up text: alphanumeric only, force uppercase
+        const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        
+        if (cleanText.length > 3) {
+            document.getElementById(targetInputId).value = cleanText;
+            showToast('Plate scanned successfully!', 'success');
+        } else {
+            showToast('Could not read plate clearly. Please try again.', 'error');
+        }
+    } catch (err) {
+        console.error('OCR Error:', err);
+        showToast('Error processing image. Try again.', 'error');
+    } finally {
+        if (scanBtn) {
+            scanBtn.innerHTML = originalText;
+            scanBtn.disabled = false;
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // SESSION & AUTH HELPERS
 // ═════════════════════════════════════════════════════════════════════════════
+
 
 /** Get the stored JWT token */
 function getToken() {

@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <style>
         #exitResultCard {
             display: none;
@@ -73,6 +74,21 @@
                     </div>
                     <div class="card-body px-4 pb-4">
                         <form id="exitForm">
+                            <div class="mb-4">
+                                <div class="bg-light p-3 rounded-3 text-center border">
+                                    <video id="exitCameraFeed" class="w-100 rounded mb-2 shadow-sm" autoplay playsinline muted style="display: none; max-height: 250px; object-fit: cover; background: #000;"></video>
+                                    <canvas id="exitCameraCanvas" style="display: none;"></canvas>
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" id="exitStartCamBtn" onclick="initCamera('exitCameraFeed', 'exitStartCamBtn', 'exitScanBtn')">
+                                            <i class="fa-solid fa-video me-1"></i>Start Camera
+                                        </button>
+                                        <button type="button" class="btn btn-primary btn-sm fw-bold" id="exitScanBtn" onclick="scanLicensePlate('exitCameraFeed', 'exitCameraCanvas', 'exitInput')" style="display: none;">
+                                            <i class="fa-solid fa-camera-retro me-1"></i>Scan Plate
+                                        </button>
+                                    </div>
+                                    <div class="form-text mt-2 small"><i class="fa-solid fa-circle-info me-1"></i>Point camera closely at the number plate to scan.</div>
+                                </div>
+                            </div>
                             <div class="mb-4">
                                 <label for="exitInput" class="form-label text-muted fw-semibold">Enter Token or Number Plate</label>
                                 <div class="input-group input-group-lg">
