@@ -9,9 +9,8 @@
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 
     <style>
         #resultCard {
@@ -76,9 +75,6 @@
                         <h4 class="mb-0 fw-bold text-secondary">
                             <i class="fa-solid fa-car-on me-2 text-primary"></i>New Vehicle Entry
                         </h4>
-                        <a href="camera.html" class="btn btn-outline-primary btn-sm fw-bold">
-                            <i class="fa-solid fa-camera me-1"></i>Use Camera
-                        </a>
                     </div>
                     <div class="card-body px-4 pb-4">
                         <form id="entryForm">
@@ -87,14 +83,14 @@
                                     <video id="entryCameraFeed" class="w-100 rounded mb-2 shadow-sm" autoplay playsinline muted style="display: none; max-height: 250px; object-fit: cover; background: #000;"></video>
                                     <canvas id="entryCameraCanvas" style="display: none;"></canvas>
                                     <div class="d-flex justify-content-center gap-2">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" id="entryStartCamBtn" onclick="initCamera('entryCameraFeed', 'entryStartCamBtn', 'entryScanBtn')">
-                                            <i class="fa-solid fa-video me-1"></i>Start Camera
+                                        <button type="button" class="btn btn-outline-primary btn-sm fw-bold" id="entryStartCamBtn" onclick="toggleScanner('entryCameraFeed', 'entryStartCamBtn', 'entryStatusText', 'plateNumber')">
+                                            <i class="fa-solid fa-power-off me-1"></i>Start Auto-Scanner
                                         </button>
-                                        <button type="button" class="btn btn-primary btn-sm fw-bold" id="entryScanBtn" onclick="scanLicensePlate('entryCameraFeed', 'entryCameraCanvas', 'plateNumber')" style="display: none;">
-                                            <i class="fa-solid fa-camera-retro me-1"></i>Scan Plate
-                                        </button>
+                                        <div id="entryStatusText" class="text-primary fw-bold align-self-center ms-2" style="display: none;">
+                                            <i class="fa-solid fa-circle-notch fa-spin me-1"></i> Scanning...
+                                        </div>
                                     </div>
-                                    <div class="form-text mt-2 small"><i class="fa-solid fa-circle-info me-1"></i>Point camera closely at the number plate to scan.</div>
+                                    <div class="form-text mt-2 small text-muted">Point camera clearly at the plate. Focus is critical.</div>
                                 </div>
                             </div>
                             <div class="mb-4">
@@ -160,6 +156,7 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="js/app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

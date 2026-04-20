@@ -76,75 +76,6 @@ function showConfirm(message, confirmText = 'Yes', cancelText = 'Cancel') {
     });
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// OCR & CAMERA HELPERS
-// ═════════════════════════════════════════════════════════════════════════════
-
-async function initCamera(videoElementId, startBtnId, scanBtnId) {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        const video = document.getElementById(videoElementId);
-        video.srcObject = stream;
-        video.style.display = 'block';
-        
-        document.getElementById(startBtnId).style.display = 'none';
-        document.getElementById(scanBtnId).style.display = 'inline-block';
-        
-        showToast('Camera started successfully.', 'success');
-    } catch (err) {
-        console.error('Camera Error:', err);
-        showToast('Unable to access camera. Please check permissions.', 'error');
-    }
-}
-
-async function scanLicensePlate(videoElementId, canvasId, targetInputId) {
-    const video = document.getElementById(videoElementId);
-    const canvas = document.getElementById(canvasId);
-    const context = canvas.getContext('2d');
-    
-    if (!video.videoWidth) {
-        showToast('Camera not ready yet.', 'error');
-        return;
-    }
-    
-    // Set canvas dimensions to match video frame
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    // Draw current video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    const scanBtn = window.event ? (window.event.currentTarget || window.event.target.closest('button')) : null;
-    let originalText = '';
-    if (scanBtn) {
-        originalText = scanBtn.innerHTML;
-        scanBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i>Scanning...';
-        scanBtn.disabled = true;
-    }
-    
-    try {
-        showToast('Analyzing image...', 'info');
-        const { data: { text } } = await Tesseract.recognize(canvas, 'eng');
-        
-        // Clean up text: alphanumeric only, force uppercase
-        const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-        
-        if (cleanText.length > 3) {
-            document.getElementById(targetInputId).value = cleanText;
-            showToast('Plate scanned successfully!', 'success');
-        } else {
-            showToast('Could not read plate clearly. Please try again.', 'error');
-        }
-    } catch (err) {
-        console.error('OCR Error:', err);
-        showToast('Error processing image. Try again.', 'error');
-    } finally {
-        if (scanBtn) {
-            scanBtn.innerHTML = originalText;
-            scanBtn.disabled = false;
-        }
-    }
-}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SESSION & AUTH HELPERS
@@ -217,6 +148,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (document.getElementById('logsTableBody')) {
         renderLogsTable();
+    }
+
+    // Revenue chart must render AFTER its tab is visible (Chart.js needs real dimensions)
+    const revenueTab = document.getElementById('revenue-tab');
+    if (revenueTab) {
+        revenueTab.addEventListener('shown.bs.tab', () => {
+            fetchSettings();
+            renderRevenueChart();
+        });
+    }
+
+    // Refresh logs when switching to the Logs tab
+    const logsTab = document.getElementById('logs-tab');
+    if (logsTab) {
+        logsTab.addEventListener('shown.bs.tab', () => {
+            renderLogsTable();
+        });
     }
 
     const entryForm = document.getElementById('entryForm');
@@ -602,6 +550,7 @@ async function renderLogsTable() {
                     <td>${log.date}</td>
                     <td>${log.timeIn}</td>
                     <td>${log.timeOut || '-'}</td>
+                    <td class="fw-bold text-success">${log.revenue ? '₹' + log.revenue : '-'}</td>
                     <td>${statusBadge}</td>
                     <td class="text-center">
                         <button class="btn btn-sm btn-outline-danger delete-log-btn" data-id="${log._id}" title="Delete Log">
@@ -611,6 +560,12 @@ async function renderLogsTable() {
                 `;
                 tbody.appendChild(row);
             });
+            
+            if (document.getElementById('lastCollectedRevenue')) {
+                const lastRevLog = logs.reverse().find(l => l.status === 'Exited' && l.revenue > 0);
+                document.getElementById('lastCollectedRevenue').innerText = lastRevLog ? `₹${lastRevLog.revenue}` : '₹0';
+            }
+
             document.querySelectorAll('.delete-log-btn').forEach(btn => {
                 btn.addEventListener('click', function () {
                     deleteLog(this.getAttribute('data-id'));
@@ -727,3 +682,169 @@ function refreshDashboardUI() {
         console.warn('Socket.io initialization skipped:', err.message);
     }
 })();
+
+// ═════════════════════════════════════════════════════════════════════════════
+// REVENUE DASHBOARD
+// ═════════════════════════════════════════════════════════════════════════════
+
+let revenueChartInstance = null;
+
+async function fetchSettings() {
+    try {
+        const settings = await apiFetch('/settings');
+        if (document.getElementById('ratePerHour')) {
+            document.getElementById('ratePerHour').value = settings.visitorRatePerHour;
+        }
+    } catch (err) {
+        console.error('Failed to load settings:', err.message);
+    }
+}
+
+async function renderRevenueChart() {
+    const canvas = document.getElementById('revenueChart');
+    if (!canvas) return;
+
+    try {
+        const chartData = await apiFetch('/settings/revenue-chart');
+        const ctx = canvas.getContext('2d');
+
+        if (revenueChartInstance) {
+            revenueChartInstance.destroy();
+        }
+
+        revenueChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    label: 'Daily Revenue (₹)',
+                    data: chartData.data,
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    } catch (err) {
+        console.error('Failed to render revenue chart:', err.message);
+    }
+}
+
+if (document.getElementById('settingsForm')) {
+    document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const rate = document.getElementById('ratePerHour').value;
+        try {
+            await apiFetch('/settings', {
+                method: 'PUT',
+                body: JSON.stringify({ visitorRatePerHour: rate })
+            });
+            showToast('Pricing settings updated successfully', 'success');
+            renderRevenueChart();
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    });
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CAMERA LOGIC & YOLO SCANNING
+// ═════════════════════════════════════════════════════════════════════════════
+
+
+let activeStream = null;
+let scanningInterval = null;
+
+async function toggleScanner(videoId, btnId, statusId, inputId, isExit = false) {
+    const video = document.getElementById(videoId);
+    const btn = document.getElementById(btnId);
+    const status = document.getElementById(statusId);
+
+    if (activeStream) {
+        // Stop scanning
+        clearInterval(scanningInterval);
+        activeStream.getTracks().forEach(t => t.stop());
+        activeStream = null;
+        video.style.display = 'none';
+        status.style.display = 'none';
+        btn.innerHTML = '<i class="fa-solid fa-power-off me-1"></i>Start Auto-Scanner';
+        btn.className = `btn btn-outline-${isExit ? 'danger' : 'primary'} btn-sm fw-bold`;
+        return;
+    }
+
+    try {
+        activeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = activeStream;
+        video.style.display = 'block';
+        status.style.display = 'block';
+        btn.innerHTML = '<i class="fa-solid fa-stop me-1"></i>Stop Scanner';
+        btn.className = `btn btn-${isExit ? 'danger' : 'primary'} btn-sm fw-bold`;
+
+        // Start scanning frames
+        scanningInterval = setInterval(() => {
+            scanFrame(videoId, inputId, btnId, isExit);
+        }, 1500); // scan every 1.5s
+    } catch (err) {
+        showToast('Camera access denied or unavailable.', 'error');
+        console.error(err);
+    }
+}
+
+async function scanFrame(videoId, inputId, btnId, isExit = false) {
+    const video = document.getElementById(videoId);
+    if (!video || video.videoWidth === 0) return;
+
+    // Use a canvas to capture the frame
+    const canvasId = videoId.replace('Feed', 'Canvas');
+    let canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(async (blob) => {
+        try {
+            const formData = new FormData();
+            formData.append('image', blob, 'frame.jpg');
+
+            const token = getToken();
+            const res = await fetch(`${API_BASE}/parking/scan`, {
+                method: 'POST',
+                headers: {
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: formData
+            });
+
+            if (!res.ok) return; // Silent fail for continuous scanning to avoid spam
+
+            const data = await res.json();
+            if (data && data.text && data.text.length >= 3) {
+                // Populate input and stop scanner
+                document.getElementById(inputId).value = data.text;
+                showToast(`Scanned Plate: ${data.text} (Confidence: ${(data.confidence * 100).toFixed(1)}%)`, 'success');
+                
+                // simulate click to turn off scanner
+                document.getElementById(btnId).click();
+                
+                if (!isExit) {
+                    autoAssignSlot();
+                }
+            }
+        } catch (err) {
+            console.error('Scan API error:', err);
+        }
+    }, 'image/jpeg', 0.8);
+}
+

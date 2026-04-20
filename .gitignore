@@ -1,7 +1,28 @@
+# Node.js
 node_modules/
+backend/node_modules/
+npm-debug.log*
+
+# Environment variables
 .env
+backend/.env
+
+# Python
+.venv/
+scanner/venv/
+scanner/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# YOLO weights (large binary — download separately)
+scanner/yolov8n.pt
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Build outputs
 dist/
 build/
-backend/node_modules/
-backend/.env

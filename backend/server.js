@@ -1,10 +1,11 @@
 // ─── Load environment variables FIRST ─────────────────────────────────────────
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const express  = require('express');
 const http     = require('http');
 const mongoose = require('mongoose');
 const cors     = require('cors');
+const path     = require('path');
 const { Server } = require('socket.io');
 
 // ─── Express app + HTTP server ───────────────────────────────────────────────
@@ -32,7 +33,13 @@ io.on('connection', (socket) => {
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+// Redirect root to login page
+app.get('/', (_req, res) => {
+    res.redirect('/login.html');
+});
 
 // ─── Auth Middleware ─────────────────────────────────────────────────────────
 const { protect } = require('./middleware/authMiddleware');
@@ -41,6 +48,7 @@ const { protect } = require('./middleware/authMiddleware');
 const authRoutes     = require('./routes/authRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const parkingRoutes  = require('./routes/parkingRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 
 // Public routes (no JWT required)
 app.use('/api/auth', authRoutes);
@@ -48,6 +56,7 @@ app.use('/api/auth', authRoutes);
 // Protected routes (JWT required)
 app.use('/api/employees', protect, employeeRoutes);
 app.use('/api/parking',   protect, parkingRoutes);
+app.use('/api/settings',  protect, settingsRoutes);
 
 // ─── Health-check route (public) ─────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {

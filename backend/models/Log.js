@@ -42,6 +42,10 @@ const logSchema = new mongoose.Schema(
             enum: ['Parked', 'Exited'],
             default: 'Parked',
         },
+        revenue: {
+            type: Number,
+            default: 0
+        }
     },
     {
         timestamps: true, // adds createdAt & updatedAt

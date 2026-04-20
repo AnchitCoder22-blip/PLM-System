@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const Log = require('../models/Log');
 const Employee = require('../models/Employee');
+const Settings = require('../models/Settings');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
 
 // ─── Zone Configuration (mirrors frontend ZONE_CONFIG) ───────────────────────
 const ZONE_CONFIG = {
@@ -11,7 +14,7 @@ const ZONE_CONFIG = {
 const SLOTS_PER_BLOCK = 20;
 const TOTAL_EMP_SLOTS = ZONE_CONFIG.employee.blocks.length * SLOTS_PER_BLOCK; // 40
 const TOTAL_VIS_SLOTS = ZONE_CONFIG.visitor.blocks.length * SLOTS_PER_BLOCK;  // 40
-const VISITOR_RATE_PER_HOUR = 10; // ₹10 per hour or part thereof
+
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -75,6 +78,35 @@ router.get('/logs', async (_req, res) => {
     }
 });
 
+// ─── POST /api/parking/scan ── Scan license plate via Python Microservice ────
+router.post('/scan', upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No image provided' });
+        }
+        
+        const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+        const formData = new FormData();
+        formData.append('file', blob, 'image.jpg');
+
+        const response = await fetch('http://localhost:8000/scan', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorData = await response.text();
+            throw new Error(`Python API Error: ${response.status} - ${errorData}`);
+        }
+
+        const data = await response.json();
+        res.json(data);
+    } catch (err) {
+        console.error('POST /api/parking/scan error:', err.message);
+        res.status(500).json({ error: 'Failed to scan image.' });
+    }
+});
+
 // ─── DELETE /api/parking/logs/:id ── Delete a single log ─────────────────────
 router.delete('/logs/:id', async (req, res) => {
     try {
@@ -101,7 +133,7 @@ router.get('/stats', async (_req, res) => {
         const activeEmp = activeParkings.filter(l => l.type === 'Employee').length;
         const activeVis = activeParkings.filter(l => l.type === 'Visitor').length;
 
-        // Revenue: visitor exits today, ₹10/hr
+        // Revenue: sum of revenue from visitors exiting today
         const today = new Date().toLocaleDateString();
         const todayExitedVisitors = await Log.find({
             status: 'Exited',
@@ -111,14 +143,11 @@ router.get('/stats', async (_req, res) => {
 
         let dailyRevenue = 0;
         todayExitedVisitors.forEach(log => {
-            try {
-                const inDate  = new Date(`${log.date} ${log.timeIn}`);
-                const outDate = log.timeOut ? new Date(`${log.date} ${log.timeOut}`) : new Date();
-                const diffMs  = Math.max(0, outDate - inDate);
-                const hours   = Math.ceil(diffMs / (1000 * 60 * 60));
-                dailyRevenue += hours * VISITOR_RATE_PER_HOUR;
-            } catch (_) { /* skip malformed dates */ }
+            if (log.revenue) {
+                dailyRevenue += log.revenue;
+            }
         });
+
 
         res.json({
             totalSlots:     TOTAL_EMP_SLOTS + TOTAL_VIS_SLOTS,
@@ -254,14 +283,21 @@ router.post('/exit', async (req, res) => {
             // Revenue for visitors
             if (record.type === 'Visitor') {
                 const hours = Math.ceil(diff / 3600);
-                revenueCharged = hours * VISITOR_RATE_PER_HOUR;
+                
+                // Fetch dynamic rate
+                let settings = await Settings.findOne();
+                let rate = settings ? settings.visitorRatePerHour : 10;
+                
+                revenueCharged = hours * rate;
             }
         } catch (_) { /* keep default durationStr */ }
 
         // ── Update the record ────────────────────────────────────────────
         record.status = 'Exited';
         record.timeOut = exitTimeStr;
+        record.revenue = revenueCharged;
         await record.save();
+
 
         // Broadcast real-time update
         const io = req.app.get('io');

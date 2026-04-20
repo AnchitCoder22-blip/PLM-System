@@ -341,6 +341,20 @@ body.dark-mode .navbar-toggler-icon {
     }
 }
 
+@media (max-width: 576px) {
+    .parking-slot {
+        width: calc(25% - 10px); /* 4 slots per row */
+        height: 65px;
+    }
+}
+
+@media (max-width: 400px) {
+    .parking-slot {
+        width: calc(33.33% - 10px); /* 3 slots per row */
+        height: 60px;
+    }
+}
+
 .parking-slot:hover {
     transform: translateY(-2px) scale(1.05);
     box-shadow: 0 4px 8px var(--core-shadow);
@@ -467,6 +481,12 @@ body.dark-mode .brand-panel { background: #020617 !important; }
 .brand-panel i, .brand-panel h2, .brand-panel p { color: var(--core-surface) !important; }
 
 .forms-panel { padding: 4rem; background: var(--core-surface); }
+
+@media (max-width: 768px) {
+    .forms-panel { padding: 2rem 1.5rem; }
+    .brand-panel { padding: 2rem 1.5rem; }
+    .login-container { padding: 1rem; }
+}
 
 /* Nav pills on login */
 .nav-pills .nav-link {

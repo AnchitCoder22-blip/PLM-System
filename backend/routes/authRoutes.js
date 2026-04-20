@@ -59,7 +59,7 @@ router.post('/setup', async (req, res) => {
         // Create default admin
         const admin = await User.create({
             username: 'admin',
-            password: 'admin123',
+            password: 'admin14',
             role: 'admin',
         });
 
